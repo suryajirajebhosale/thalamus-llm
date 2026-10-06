@@ -1,0 +1,35 @@
+# demo.yaml: runs with NO API keys. Every provider is `echo`, which replies
+# with the prompt tagged by the provider and model that served it, so you can
+# watch routing decisions without spending tokens.
+#
+#   thalamus ask examples/demo.yaml chat_reply "hello"
+#   thalamus explain examples/demo.yaml summarize_thread
+
+providers:
+  hosted: {type: echo}
+  openai: {type: echo}
+  claude: {type: echo}
+
+defaults:
+  provider: openai
+  timeout: 10
+  fallback: [openai]
+  models:
+    hosted: my-org/llama-3.1-8b-instruct
+    openai: gpt-4o-mini
+    claude: claude-opus-5-5
+
+tasks:
+  gates:
+    intent_classifier:
+      provider: hosted
+      timeout: 2
+      temperature: 0
+  user_facing:
+    chat_reply:
+      provider: claude
+      fallback: [openai]
+  background:
+    summarize_thread:
+      provider: hosted
+      fallback: [claude, openai]

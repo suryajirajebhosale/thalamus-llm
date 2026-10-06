@@ -1,0 +1,66 @@
+# thalamus.yaml: providers + routing policy in one file.
+#
+# Keys are never written here, only the NAME of the environment variable that
+# holds each one (set them in .env or your shell; see .env.example).
+# Delete any provider you don't use, and any task that points at it.
+
+providers:
+  openai:
+    type: openai                       # OpenAI Chat Completions API
+    api_key_env: OPENAI_API_KEY
+
+  claude:
+    type: anthropic                    # Anthropic Messages API
+    api_key_env: ANTHROPIC_API_KEY
+
+  gemini:
+    type: openai                       # Gemini via its OpenAI-compatible endpoint
+    api_key_env: GEMINI_API_KEY
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+
+  local:
+    type: openai                       # any OpenAI-compatible server: Ollama, vLLM, LM Studio...
+    base_url_env: LOCAL_LLM_BASE_URL   # e.g. http://localhost:11434/v1 for Ollama
+    tool_calling: false
+
+defaults:
+  provider: openai
+  timeout: 30
+  fallback: [openai]                   # where traffic goes when a provider fails
+  models:                              # each provider's default model, set once here
+    openai: gpt-4o-mini
+    claude: claude-opus-5-5
+    gemini: gemini-2.0-flash
+    local: llama3.1:8b
+
+tasks:
+  # Group names (gates, user_facing, ...) become each task's `tier` label.
+  gates:
+    intent_classifier:                 # runs first on every turn: cheap, fast, fail over quickly
+      provider: local
+      timeout: 8
+      temperature: 0                   # unknown keys pass straight through to the provider
+    extract_entities:
+      provider: gemini
+      fallback: [openai]
+      timeout: 15
+
+  planning:
+    plan_steps:
+      provider: openai
+      model: o4-mini                   # a task can pin its own model
+      reasoning_effort: low
+      tool_calling: true
+      max_tokens: 800
+
+  user_facing:
+    chat_reply:
+      provider: claude
+      fallback: [openai]
+      reasoning_effort: low            # Claude: output_config.effort; OpenAI: reasoning_effort
+
+  background:
+    summarize_thread:
+      provider: local
+      fallback: [gemini, openai]
+      timeout: 60                      # runs off the request path; can be slow
